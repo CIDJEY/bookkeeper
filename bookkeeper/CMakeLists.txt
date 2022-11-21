@@ -10,4 +10,10 @@ set(BOOKKEEPER_SOURCES
 set(SOURCES
 	${BOOKKEEPER_SOURCES})
 
-add_executable(bookkeeper ${SOURCES})
+set(EXECUTABLE_NAME bookkeeper)
+
+add_executable(${EXECUTABLE_NAME} ${SOURCES})
+
+target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR}/asio)
+target_link_libraries(${EXECUTABLE_NAME} pthread)
+
