@@ -1,15 +1,14 @@
 
-
 #include <iostream>
-#include <asio.hpp>
 
 int main(int argc, char** argv) {
+	try {
 
-	asio::io_context io;
+		std::cout << "Hello world\n";
 
-	asio::steady_timer timer(io, asio::chrono::seconds(3));
+	} catch (const std::exception& error) {
+		std::cerr << error.what() << std::endl;
+	}
 
-	timer.wait();
-	std::cout << "Hello world\n";
 	return 0;
 }
