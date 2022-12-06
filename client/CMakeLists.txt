@@ -12,5 +12,6 @@ set(EXECUTABLE_NAME client)
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
-target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR})
+target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR}
+													  ${3RD_PARTY_DIR}/asio)
 
