@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
 
-set(CMAKE_CXX_STANDARD 20)
+project(bookkeeper-main)
 
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out/bin)
+find_package(OpenSSL)
 
 set(BOOKKEEPER_SOURCES
 	src/main.cpp)
@@ -15,7 +14,7 @@ set(EXECUTABLE_NAME bookkeeper)
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
-find_package(OpenSSL)
-target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR}/asio)
+target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR})
+
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
 
