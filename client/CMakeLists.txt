@@ -15,3 +15,5 @@ add_executable(${EXECUTABLE_NAME} ${SOURCES})
 target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR}
 													  ${3RD_PARTY_DIR}/asio)
 
+target_link_libraries(${EXECUTABLE_NAME} pthread)
+

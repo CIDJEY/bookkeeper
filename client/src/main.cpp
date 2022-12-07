@@ -1,15 +1,141 @@
 
 #include <iostream>
+#include <sstream>
+#include <array>
+
+#include "asio.hpp"
 
 #include "spdlog/spdlog.h"
+
+using asio::ip::tcp;
+using asio::awaitable;
+using asio::buffer;
+using asio::co_spawn;
+using asio::streambuf;
+using asio::detached;
+using asio::use_awaitable;
+
+std::string to_string(tcp::endpoint endpoint) {
+	std::stringstream ss;
+	ss << endpoint;
+
+	return ss.str();
+}
+
+struct Session {
+	Session() = delete;
+	Session(const Session&) = delete;
+	Session& operator=(const Session&) = delete;
+
+	explicit Session(tcp::socket socket);
+
+	~Session();
+
+	awaitable<void> run();
+	void close();
+
+private:
+	tcp::socket mSocket;
+	uint32_t mNum;
+
+	static uint32_t sNumCounter;
+};
+
+uint32_t Session::sNumCounter = 0;
+
+Session::Session(tcp::socket socket)
+	: mSocket(std::move(socket))
+	, mNum(++sNumCounter)
+{
+}
+
+awaitable<void> Session::run() {
+	spdlog::info("[Session] #{}: started new session with {}", mNum, to_string(mSocket.remote_endpoint()));
+	spdlog::info("[Session] #{}: type \":exit\" to exit the sesison", mNum);
+
+	auto inputStream = streambuf{1024};
+	auto streamDescriptor = asio::posix::stream_descriptor{co_await asio::this_coro::executor, ::dup(STDIN_FILENO)};
+
+	std::array<uint8_t, 1024> buf;
+
+	while(true) {
+		auto bytes = co_await asio::async_read_until(streamDescriptor, inputStream, "\n", use_awaitable);
+
+		std::istream is(&inputStream);
+		std::string message;
+		std::getline(is, message);
+
+		spdlog::info("[Session] #{}: Sending message \"{}\"", mNum, message);
+
+		co_await async_write(mSocket, buffer(message), use_awaitable);
+
+		bytes = co_await mSocket.async_read_some(buffer(buf), use_awaitable);
+
+		message = std::string{(const char*)buf.data(), bytes};
+		spdlog::info("[Session] #{}: got reply from server: {}", mNum, message);
+	}
+
+}
+
+Session::~Session() {
+	spdlog::info("[Session] #{}: destroying connection", mNum);
+	close();
+}
+
+
+void Session::close() {
+	if (mSocket.is_open()) {
+		spdlog::info("[Session] #{}: Closing socket", mNum);
+	}
+}
+
+struct Client {
+	Client(asio::io_context& io): mIo(io) {}
+	Client(const Client&) = delete;
+	Client& operator=(const Client&) = delete;
+
+	awaitable<void> runSession(tcp::endpoint endpoint);
+
+private:
+	asio::io_context& mIo;
+};
+
+awaitable<void> Client::runSession(tcp::endpoint endpoint) {
+	try {
+		spdlog::info("[Client] Starting new session with {}", to_string(endpoint));
+
+		tcp::socket socket(mIo);
+		co_await socket.async_connect(endpoint, use_awaitable);
+
+		spdlog::info("[Client] Connected!");
+
+		auto session = Session(std::move(socket));
+
+		co_await session.run();
+	} catch (const std::exception& error) {
+		spdlog::info("[Client]: caught exception: {}", error.what());
+	}
+
+
+	co_return;
+}
+
 
 int main(int argc, char** argv) {
 	try {
 		spdlog::set_level(spdlog::level::debug);
 
-		spdlog::info("Hello world! from the client!");
+		asio::io_context io;
+
+		auto client = Client{io};
+
+		auto endpoint = *tcp::resolver(io).resolve("", "50000");
+		co_spawn(io, client.runSession(endpoint), detached);
+
+		io.run();
+
 	} catch (const std::exception& error) {
-		std::cerr << error.what() << std::endl;
+		spdlog::error("{}", error.what());
 	}
 
 }

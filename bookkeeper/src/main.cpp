@@ -36,6 +36,7 @@ struct Session {
 
 private:
 	awaitable<std::string> getMessage();
+	awaitable<void> sendMessage(const std::string& message);
 
 	tcp::socket mSocket;
 	uint32_t mNum;
@@ -63,6 +64,8 @@ awaitable<void> Session::run() {
 		auto message = co_await getMessage();
 
 		spdlog::info("[Session] #{}: Message from {}: {}", mNum, to_string(mSocket.remote_endpoint()), message);
+		message += " yourself!";
+		co_await sendMessage(message);
 	}
 
 	close();
@@ -80,6 +83,10 @@ awaitable<std::string> Session::getMessage() {
 	auto bytes = co_await mSocket.async_read_some(buffer(mBuffer), use_awaitable);
 
 	co_return std::string{(const char*)mBuffer.data(), bytes};
+}
+
+awaitable<void> Session::sendMessage(const std::string& message) {
+	co_await async_write(mSocket, buffer(message), use_awaitable);
 }
 
 struct Server {
