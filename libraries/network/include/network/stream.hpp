@@ -81,6 +81,7 @@ using SslSocket = asio::ssl::stream<TcpSocket>;
 
 struct SslStream: Stream<SslSocket>
 {
+	using Stream<SslSocket>::Stream;
 	SslStream(SslStream&& other): Stream<SslSocket>(std::move(other)) {}
 	~SslStream() { close(); }
 
