@@ -14,6 +14,8 @@ set(EXECUTABLE_NAME client)
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
+#add_dependencies(${EXECUTABLE_NAME} network)
+
 target_include_directories(${EXECUTABLE_NAME} PRIVATE ${3RD_PARTY_DIR}
 													  ${3RD_PARTY_DIR}/asio)
 

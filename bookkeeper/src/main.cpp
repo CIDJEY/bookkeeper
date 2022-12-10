@@ -5,8 +5,7 @@
 
 #include "spdlog/spdlog.h"
 
-#include "asio.hpp"
-#include "asio/ssl.hpp"
+#include "session.hpp"
 
 using asio::io_context;
 using asio::buffer;
@@ -16,80 +15,6 @@ using asio::awaitable;
 using asio::use_awaitable;
 using asio::detached;
 using asio::ssl::context;
-
-std::string to_string(const tcp::endpoint& endpoint) {
-	std::stringstream ss;
-	ss << endpoint;
-	return ss.str();
-}
-
-struct Session {
-	Session() = delete;
-	Session(const Session& other) = delete;
-	Session& operator=(const Session& other) = delete;
-
-	explicit Session(tcp::socket socket);
-
-	uint32_t num() const { return mNum; }
-	awaitable<void> run();
-	void close();
-
-	~Session();
-
-private:
-	awaitable<std::string> getMessage();
-	awaitable<void> sendMessage(const std::string& message);
-
-	tcp::socket mSocket;
-	uint32_t mNum;
-	std::array<uint8_t, 1024> mBuffer;
-
-	static uint32_t sNumCounter;
-};
-
-uint32_t Session::sNumCounter = 0;
-
-Session::Session(tcp::socket socket)
-	: mSocket(std::move(socket))
-	, mNum(++sNumCounter)
-{}
-
-Session::~Session() {
-	spdlog::debug("[Session] #{}: Destroying session", mNum);
-	close();
-}
-
-awaitable<void> Session::run() {
-	spdlog::info("[Session] #{}: Started new connection with {}", mNum, to_string(mSocket.remote_endpoint()));
-
-	while (true) {
-		auto message = co_await getMessage();
-
-		spdlog::info("[Session] #{}: Message from {}: {}", mNum, to_string(mSocket.remote_endpoint()), message);
-		message += " yourself!";
-		co_await sendMessage(message);
-	}
-
-	close();
-	co_return;
-}
-
-void Session::close() {
-	if (mSocket.is_open()) {
-		spdlog::debug("[Session] #{}: Closing socket", mNum);
-		mSocket.close();
-	}
-}
-
-awaitable<std::string> Session::getMessage() {
-	auto bytes = co_await mSocket.async_read_some(buffer(mBuffer), use_awaitable);
-
-	co_return std::string{(const char*)mBuffer.data(), bytes};
-}
-
-awaitable<void> Session::sendMessage(const std::string& message) {
-	co_await async_write(mSocket, buffer(message), use_awaitable);
-}
 
 using ssl_socket = asio::ssl::stream<tcp::socket>;
 
@@ -162,10 +87,10 @@ awaitable<void> SslSession::sendMessage(const std::string& message) {
 }
 
 awaitable<void> SslSession::run() {
-	spdlog::info("[Session] #{}: Started new connection with {}", mNum, to_string(mSocket.lowest_layer().remote_endpoint()));
+	//spdlog::info("[Session] #{}: Started new connection with {}", mNum, to_string(mSocket.lowest_layer().remote_endpoint()));
 	while (true) {
 		auto message = co_await getMessage();
-		spdlog::info("[Session] #{}: Message from {}: {}", mNum, to_string(mSocket.lowest_layer().remote_endpoint()), message);
+	//	spdlog::info("[Session] #{}: Message from {}: {}", mNum, to_string(mSocket.lowest_layer().remote_endpoint()), message);
 
 		message += " yourself!";
 
@@ -174,27 +99,22 @@ awaitable<void> SslSession::run() {
 }
 
 struct Server {
-
 	Server() = delete;
 	Server(const Server&) = delete;
 	Server& operator=(const Server&) = delete;
 
-	explicit Server(io_context& ctx, tcp::endpoint listenEndpoint, bool isSecure);
+	explicit Server(io_context& ctx, tcp::endpoint listenEndpoint);
 	~Server();
 
 	awaitable<void> start();
 	awaitable<void> handleAccept(tcp::socket socket);
-	awaitable<void> handleAcceptSecure(tcp::socket socket);
 
 private:
 	tcp::acceptor mAcceptor;
-
-	bool mIsSecure;
 };
 
-Server::Server(io_context& ctx, tcp::endpoint listenEndpoint, bool isSecure)
+Server::Server(io_context& ctx, tcp::endpoint listenEndpoint)
 	: mAcceptor{ctx, listenEndpoint}
-	, mIsSecure(isSecure)
 {
 }
 
@@ -203,20 +123,16 @@ Server::~Server() {
 }
 
 awaitable<void> Server::start() {
-	spdlog::info("[Server]: Starting server on {}", to_string(mAcceptor.local_endpoint()));
+	spdlog::info("[Server]: Starting server on {}", network::to_string(mAcceptor.local_endpoint()));
 
 	while (true) {
 		auto socket = co_await mAcceptor.async_accept(use_awaitable);
-		if (mIsSecure) {
-			co_spawn(mAcceptor.get_executor(), handleAcceptSecure(std::move(socket)), detached);
-		} else {
-			co_spawn(mAcceptor.get_executor(), handleAccept(std::move(socket)), detached);
-		}
+		co_spawn(mAcceptor.get_executor(), handleAccept(std::move(socket)), detached);
 	}
 }
 
 awaitable<void> Server::handleAccept(tcp::socket socket) {
-	auto session = Session{std::move(socket)};
+	auto session = bookkeeper::Session{network::TcpStream{std::move(socket)}};
 
 	try {
 		co_await session.run();
@@ -225,7 +141,7 @@ awaitable<void> Server::handleAccept(tcp::socket socket) {
 	}
 }
 
-awaitable<void> Server::handleAcceptSecure(tcp::socket socket) {
+/*awaitable<void> Server::handleAcceptSecure(tcp::socket socket) {
 	auto sslCtx = asio::ssl::context{context::sslv23};
 
 	try {
@@ -250,19 +166,18 @@ awaitable<void> Server::handleAcceptSecure(tcp::socket socket) {
 		spdlog::error("#{}: {}", session.num(), error.what());
 	}
 
-}
+}*/
 
 int main(int argc, char** argv) {
 	try {
 		spdlog::set_level(spdlog::level::debug);
-
 		io_context io;
 
-		auto serverTcp = Server{io, *tcp::resolver(io).resolve("", "8080"), false};
-		auto serverSsl = Server{io, *tcp::resolver(io).resolve("", "8443"), true};
+		auto serverTcp = Server{io, *tcp::resolver(io).resolve("", "8080")};
+		//auto serverSsl = Server{io, *tcp::resolver(io).resolve("", "8443"), true};
 
 		co_spawn(io, serverTcp.start(), detached);
-		co_spawn(io, serverSsl.start(), detached);
+		//co_spawn(io, serverSsl.start(), detached);
 
 		io.run();
 	} catch (const std::exception& error) {

@@ -195,16 +195,17 @@ awaitable<void> Client::runSession(tcp::endpoint endpoint) {
 
 		ctx.set_verify_mode(asio::ssl::verify_none);
 
-		ssl_socket socket(mIo, ctx);
-		co_await socket.lowest_layer().async_connect(endpoint, use_awaitable);
+		//ssl_socket socket(mIo, ctx);
+		tcp::socket socket(mIo);
+		co_await socket.async_connect(endpoint, use_awaitable);
 
 		spdlog::info("[Client] Connected!");
 
-		auto session = SessionSecure(std::move(socket));
+		auto session = Session(std::move(socket));
 
-		co_await session.completeConnect();
+		//co_await session.completeConnect();
 		co_await session.run();
-		co_await session.shutdown();
+		//co_await session.shutdown();
 
 
 	} catch (const std::exception& error) {
@@ -224,7 +225,7 @@ int main(int argc, char** argv) {
 
 		auto client = Client{io};
 
-		auto endpoint = *tcp::resolver(io).resolve("", "8443");
+		auto endpoint = *tcp::resolver(io).resolve("", "8080");
 		co_spawn(io, client.runSession(endpoint), detached);
 
 		io.run();
@@ -232,5 +233,4 @@ int main(int argc, char** argv) {
 	} catch (const std::exception& error) {
 		spdlog::error("{}", error.what());
 	}
-
 }
