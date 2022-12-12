@@ -12,6 +12,15 @@ struct Channel {
 	Channel() = delete;
 	Channel(const Channel&) = delete;
 	Channel& operator=(const Channel&) = delete;
+
+	Channel(Channel<Stream>&& other)
+		: mStream{std::move(other.mStream)}
+	{}
+
+	Channel& operator=(Channel<Stream>&& other) {
+		std::swap(mStream, other.mStream);
+	}
+
 	Channel(Stream&& stream)
 		: mStream{std::move(stream)}
 	{}

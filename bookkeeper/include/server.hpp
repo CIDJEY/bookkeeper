@@ -25,7 +25,7 @@ struct Server {
 	{
 	}
 
-	~Server() {}
+	virtual ~Server() {}
 
 	awaitable<void> start(auto&& handleAccept) {
 		auto endpoint = tcp::endpoint(tcp::v4(), mPort);

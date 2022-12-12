@@ -75,6 +75,8 @@ struct TcpStream: Stream<TcpSocket> {
 			mHandler.close();
 		}
 	}
+
+	const static bool isSecure = false;
 };
 
 using SslSocket = asio::ssl::stream<TcpSocket>;
@@ -97,6 +99,8 @@ struct SslStream: Stream<SslSocket>
 			mHandler.lowest_layer().close();
 		}
 	}
+
+	const static bool isSecure = true;
 };
 
 } //namespace network
