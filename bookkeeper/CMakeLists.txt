@@ -14,12 +14,15 @@ set(EXECUTABLE_NAME bookkeeper)
 
 add_executable(${EXECUTABLE_NAME} ${SOURCES})
 
-#add_dependencies(${EXECUTABLE_NAME} network)
-
 target_include_directories(${EXECUTABLE_NAME} PRIVATE include
 													  ${LIBRARY_DIR}/network/include
 													  ${3RD_PARTY_DIR}
 													  ${3RD_PARTY_DIR}/asio)
 
 target_link_libraries(${EXECUTABLE_NAME} PRIVATE pthread OpenSSL::SSL OpenSSL::Crypto)
+
+add_custom_command(TARGET ${EXECUTABLE_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/out/etc/cert/
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/etc/cert/* ${CMAKE_BINARY_DIR}/out/etc/cert/
+)
 

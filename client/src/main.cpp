@@ -225,7 +225,7 @@ int main(int argc, char** argv) {
 
 		auto client = Client{io};
 
-		auto endpoint = *tcp::resolver(io).resolve("", "8443");
+		auto endpoint = *tcp::resolver(io).resolve("0.0.0.0", "8443");
 		co_spawn(io, client.runSession(endpoint), detached);
 
 		io.run();
